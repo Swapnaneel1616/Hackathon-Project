@@ -3,7 +3,7 @@
 import { useLayoutEffect, useState } from "react";
 import { ReliefGridShieldLogo } from "@/components/brand/reliefgrid-shield-logo";
 
-const INTRO_SESSION_KEY = "reliefgrid_intro_shown_session";
+const INTRO_SESSION_KEY = "reliefconnect_intro_shown_session";
 
 const INTRO_MS = 3200;
 
@@ -64,7 +64,7 @@ export function LandingWithIntro({ children }: { children: React.ReactNode }) {
                 RELIEF
               </p>
               <p className="mt-2 font-serif text-[clamp(1.1rem,3.8vw,1.5rem)] font-semibold tracking-[0.42em] text-[#4978bc]">
-                GRID
+                CONNECT
               </p>
               <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--caption-muted)]">
                 Disaster food · Precaution &amp; reserves

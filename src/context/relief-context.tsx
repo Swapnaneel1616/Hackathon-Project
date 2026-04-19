@@ -80,7 +80,7 @@ function migrateUser(u: unknown): UserProfile | null {
   }
   if (isLegacyUser(u)) {
     return {
-      email: `legacy_${String(u.phone).replace(/\W/g, "")}@reliefgrid.demo`,
+      email: `legacy_${String(u.phone).replace(/\W/g, "")}@reliefconnect.demo`,
       firstName: "Community",
       lastName: "Member",
       phone: u.phone,
@@ -236,7 +236,7 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
               ? t
               : {
                   ...t,
-                  donorEmail: "unknown@reliefgrid.demo",
+                  donorEmail: "unknown@reliefconnect.demo",
                   donorDisplayName: "Unknown donor",
                 },
           ),

@@ -46,7 +46,7 @@ export default function LandingContent() {
             <div className="flex flex-wrap items-end gap-4">
               <ReliefGridShieldLogo className="h-16 w-16 shrink-0 opacity-95 drop-shadow-lg sm:h-[4.5rem] sm:w-[4.5rem]" />
               <h1 className="text-balance font-bold tracking-tight text-[#f5faf6] [font-size:clamp(2rem,5vw,3.25rem)] leading-[1.1]">
-                ReliefGrid
+                ReliefConnect
               </h1>
             </div>
             <p className="mt-4 max-w-xl text-pretty text-lg font-medium leading-snug text-[#dce8f8] md:text-xl">

@@ -17,7 +17,7 @@ export default function ResetLocalPage() {
     <div className="mx-auto max-w-md px-4 py-24 text-center">
       <h1 className="text-xl font-bold text-[var(--earth-dark)]">Reset local demo data</h1>
       <p className="mt-3 text-sm leading-relaxed text-[var(--body-text)]">
-        This removes every ReliefGrid demo record from your browser: registered residents
+        This removes every ReliefConnect demo record from your browser: registered residents
         (passwords), reservations, tickets, hub and admin sessions, funding ledger, and
         warehouse stock — then restores warehouses to the built-in seed values. This
         build does not use a remote database; nothing is deleted on a server.

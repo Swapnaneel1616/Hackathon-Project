@@ -1,5 +1,5 @@
 /**
- * Clears all ReliefGrid / relief-hub demo persistence in the browser.
+ * Clears all ReliefConnect / relief-hub demo persistence in the browser.
  * The app has no separate server DB for this hackathon build — state lives in localStorage.
  */
 export function wipeReliefHubBrowserStorage(): void {
@@ -18,7 +18,12 @@ export function wipeReliefHubBrowserStorage(): void {
     for (let i = 0; i < window.localStorage.length; i++) {
       const k = window.localStorage.key(i);
       if (!k) continue;
-      if (k.startsWith("relief-hub") || k.startsWith("reliefHub") || k.startsWith("reliefgrid")) {
+      if (
+        k.startsWith("relief-hub") ||
+        k.startsWith("reliefHub") ||
+        k.startsWith("reliefgrid") ||
+        k.startsWith("reliefconnect")
+      ) {
         extraLs.push(k);
       }
     }
@@ -33,7 +38,8 @@ export function wipeReliefHubBrowserStorage(): void {
       if (
         k.startsWith("reliefHub") ||
         k.startsWith("relief-hub") ||
-        k.startsWith("reliefgrid")
+        k.startsWith("reliefgrid") ||
+        k.startsWith("reliefconnect")
       ) {
         extraSs.push(k);
       }

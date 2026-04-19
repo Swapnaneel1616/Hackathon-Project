@@ -10,7 +10,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "ReliefGrid — Feeding communities when it matters most",
+  title: "ReliefConnect — Feeding communities when it matters most",
   description:
     "Local knowledge, pre-positioned resilience, and dignified access: reservations, hub reserves, donor verification, and master observability for equitable food relief.",
 };

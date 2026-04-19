@@ -1,4 +1,4 @@
-# ReliefGrid
+# ReliefConnect
 
 Dual-console hackathon prototype:
 

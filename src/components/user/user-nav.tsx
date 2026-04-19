@@ -27,7 +27,7 @@ export function UserNav() {
             <ReliefGridShieldLogo className="h-10 w-10 scale-95" />
           </div>
           <div>
-            <div className="text-sm font-bold tracking-tight text-[var(--earth-dark)]">ReliefGrid</div>
+            <div className="text-sm font-bold tracking-tight text-[var(--earth-dark)]">ReliefConnect</div>
             <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--caption-muted)]">
               Resident
             </div>
