@@ -11,14 +11,27 @@ import React, {
 } from "react";
 import {
   ALLOTMENT_PER_HOUSEHOLD,
+  CATEGORY_LABELS,
   WAREHOUSES as SEED_WAREHOUSES,
 } from "@/lib/mock-data";
+import { dailyLaneUsageFromReservations, localDateKey } from "@/lib/daily-lane-usage";
+import { isHubReservationIntakeClosed } from "@/lib/shelter-gate";
+import {
+  HUB_OPERATOR_ACCOUNTS,
+  HUB_OPERATOR_PASSWORD,
+  INITIAL_HUB_FUNDING_PER_WAREHOUSE,
+  RESTOCK_COST_PER_UNIT,
+} from "@/lib/hub-accounts";
 import { getAccount, saveAccount } from "@/lib/accounts-storage";
+import { wipeReliefHubBrowserStorage } from "@/lib/wipe-relief-hub-storage";
 import { levelForCategory, sortWarehousesByUrgency } from "@/lib/stock-utils";
 import type {
   CatalogItem,
   DisasterPhase,
   DonationTicket,
+  FundingRequest,
+  HubLedgerEntry,
+  HubSession,
   NutritionCategory,
   Reservation,
   TicketStatus,
@@ -31,7 +44,13 @@ const ADMIN_EMAIL = "admin@warehouse.com";
 const ADMIN_PASSWORD = "123456";
 
 const EXPIRY_POLL_MS = 15_000;
-const STORAGE_KEY = "relief-hub-state-v2";
+const STORAGE_KEY = "relief-hub-state-v3";
+
+function defaultHubFunds(): Record<string, number> {
+  return Object.fromEntries(
+    SEED_WAREHOUSES.map((w) => [w.id, INITIAL_HUB_FUNDING_PER_WAREHOUSE]),
+  );
+}
 
 function cloneWarehouses(): Warehouse[] {
   return SEED_WAREHOUSES.map((w) => ({
@@ -108,7 +127,7 @@ type ReliefContextValue = {
   createDonationTicket: (input: {
     warehouseId: string;
     lines: { item: CatalogItem; qty: number }[];
-  }) => void;
+  }) => { ok: true } | { ok: false; reason: string };
   setTicketStatus: (id: string, status: TicketStatus) => void;
   redeemBonusItem: (input: {
     warehouseId: string;
@@ -121,6 +140,27 @@ type ReliefContextValue = {
     warehouseId: string,
     next: Partial<Record<NutritionCategory, number>>,
   ) => void;
+  hubSession: HubSession | null;
+  hubFunds: Record<string, number>;
+  fundingRequests: FundingRequest[];
+  hubLedger: HubLedgerEntry[];
+  loginHub: (email: string, password: string) => { ok: true } | { ok: false; reason: string };
+  logoutHub: () => void;
+  purchaseHubStock: (
+    warehouseId: string,
+    category: NutritionCategory,
+    units: number,
+  ) => { ok: true; added: number; cost: number } | { ok: false; reason: string };
+  submitFundingRequest: (
+    warehouseId: string,
+    amount: number,
+    message: string,
+  ) => { ok: true } | { ok: false; reason: string };
+  resolveFundingRequest: (
+    id: string,
+    decision: "approved" | "rejected",
+    grantAmount?: number,
+  ) => { ok: true } | { ok: false; reason: string };
 };
 
 const ReliefContext = createContext<ReliefContextValue | null>(null);
@@ -128,6 +168,10 @@ const ReliefContext = createContext<ReliefContextValue | null>(null);
 export function ReliefProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [adminSession, setAdminSession] = useState(false);
+  const [hubSession, setHubSession] = useState<HubSession | null>(null);
+  const [hubFunds, setHubFunds] = useState<Record<string, number>>(() => defaultHubFunds());
+  const [fundingRequests, setFundingRequests] = useState<FundingRequest[]>([]);
+  const [hubLedger, setHubLedger] = useState<HubLedgerEntry[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>(cloneWarehouses);
   const [phase, setPhaseState] = useState<DisasterPhase>("watch_pre");
   const [hoursToImpact, setHoursToImpact] = useState(144);
@@ -148,6 +192,10 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
       const parsed = JSON.parse(raw) as {
         user?: unknown;
         adminSession?: boolean;
+        hubSession?: HubSession | null;
+        hubFunds?: Record<string, number>;
+        fundingRequests?: FundingRequest[];
+        hubLedger?: HubLedgerEntry[];
         warehouses?: Warehouse[];
         phase?: DisasterPhase;
         hoursToImpact?: number;
@@ -156,8 +204,26 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
         creditLedger?: Record<string, number>;
       };
       const mu = parsed.user ? migrateUser(parsed.user) : null;
-      if (mu) setUser(mu);
+      if (mu) {
+        const key = mu.email.toLowerCase();
+        const acc = getAccount(key);
+        if (acc) {
+          setUser({
+            email: key,
+            points: typeof mu.points === "number" ? mu.points : 0,
+            ...acc.profile,
+          });
+        }
+      }
       if (parsed.adminSession) setAdminSession(true);
+      if (parsed.hubSession?.warehouseId && parsed.hubSession.email) {
+        setHubSession(parsed.hubSession);
+      }
+      if (parsed.hubFunds && typeof parsed.hubFunds === "object") {
+        setHubFunds((prev) => ({ ...prev, ...parsed.hubFunds }));
+      }
+      if (parsed.fundingRequests?.length) setFundingRequests(parsed.fundingRequests);
+      if (parsed.hubLedger?.length) setHubLedger(parsed.hubLedger);
       if (parsed.warehouses?.length) setWarehouses(parsed.warehouses);
       if (parsed.phase) setPhaseState(parsed.phase);
       if (typeof parsed.hoursToImpact === "number")
@@ -186,6 +252,10 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
     const payload = {
       user,
       adminSession,
+      hubSession,
+      hubFunds,
+      fundingRequests,
+      hubLedger,
       warehouses,
       phase,
       hoursToImpact,
@@ -197,6 +267,10 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
   }, [
     user,
     adminSession,
+    hubSession,
+    hubFunds,
+    fundingRequests,
+    hubLedger,
     warehouses,
     phase,
     hoursToImpact,
@@ -229,6 +303,7 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
         profile: input.profile,
       });
       setAdminSession(false);
+      setHubSession(null);
       setCreditLedger((ledger) => {
         const bonus = ledger[email] || 0;
         const { [email]: consumed, ...rest } = ledger;
@@ -249,10 +324,17 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
     (email: string, password: string): { ok: true } | { ok: false; reason: string } => {
       const key = email.trim().toLowerCase();
       const acc = getAccount(key);
-      if (!acc || acc.password !== password) {
-        return { ok: false, reason: "Invalid email or password." };
+      if (!acc) {
+        return {
+          ok: false,
+          reason: "No resident account for this email. Register before signing in.",
+        };
+      }
+      if (acc.password !== password) {
+        return { ok: false, reason: "Incorrect password." };
       }
       setAdminSession(false);
+      setHubSession(null);
       setCreditLedger((ledger) => {
         const bonus = ledger[key] || 0;
         const { [key]: consumedKey, ...rest } = ledger;
@@ -271,6 +353,7 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
 
   const logoutUser = useCallback(() => {
     setUser(null);
+    setHubSession(null);
   }, []);
 
   const loginAdmin = useCallback(
@@ -279,9 +362,10 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
         email.trim().toLowerCase() !== ADMIN_EMAIL ||
         password !== ADMIN_PASSWORD
       ) {
-        return { ok: false, reason: "Invalid warehouse credentials." };
+        return { ok: false, reason: "Invalid master admin credentials." };
       }
       setUser(null);
+      setHubSession(null);
       setAdminSession(true);
       return { ok: true };
     },
@@ -290,6 +374,28 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
 
   const logoutAdmin = useCallback(() => {
     setAdminSession(false);
+  }, []);
+
+  const loginHub = useCallback(
+    (email: string, password: string): { ok: true } | { ok: false; reason: string } => {
+      if (password !== HUB_OPERATOR_PASSWORD) {
+        return { ok: false, reason: "Invalid email or password." };
+      }
+      const key = email.trim().toLowerCase();
+      const row = HUB_OPERATOR_ACCOUNTS.find((a) => a.email.toLowerCase() === key);
+      if (!row) {
+        return { ok: false, reason: "Use hub1@example.com, hub2@example.com, or hub3@example.com." };
+      }
+      setUser(null);
+      setAdminSession(false);
+      setHubSession({ email: key, warehouseId: row.warehouseId });
+      return { ok: true };
+    },
+    [],
+  );
+
+  const logoutHub = useCallback(() => {
+    setHubSession(null);
   }, []);
 
   const setPhase = useCallback((p: DisasterPhase) => {
@@ -344,6 +450,13 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
       if (!user) return { ok: false, reason: "Sign in required." };
       const w = warehouses.find((x) => x.id === input.warehouseId);
       if (!w) return { ok: false, reason: "Warehouse not found." };
+      if (isHubReservationIntakeClosed(phase, hoursToImpact)) {
+        return {
+          ok: false,
+          reason:
+            "This hub is closed for new reservations while disaster coordination is active. Stock is being routed to official shelter sites — use the Shelter tab for locations and guidance.",
+        };
+      }
 
       const limits: Record<NutritionCategory, number> = {
         protein: 0,
@@ -371,6 +484,25 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
           return {
             ok: false,
             reason: `Over allotment for ${c} (${used[c]} > ${limits[c]}).`,
+          };
+        }
+      }
+
+      const todayKey = localDateKey();
+      const emailLower = user.email.toLowerCase();
+      const dailyUsed = dailyLaneUsageFromReservations(
+        reservations,
+        emailLower,
+        todayKey,
+      );
+      for (const c of Object.keys(used) as NutritionCategory[]) {
+        if (used[c] <= 0) continue;
+        const totalToday = dailyUsed[c] + used[c];
+        if (totalToday > limits[c]) {
+          const label = CATEGORY_LABELS[c] ?? c;
+          return {
+            ok: false,
+            reason: `Daily ${label} limit for your household is ${limits[c]}. You already have ${dailyUsed[c]} units reserved or picked up today; this basket would add ${used[c]}. Remove some ${label} or try again tomorrow.`,
           };
         }
       }
@@ -405,6 +537,7 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
             category: l.item.category,
             qty: l.qty,
           })),
+        residentEmail: user.email.toLowerCase(),
         createdAt: Date.now(),
         expiresAt: Date.now() + input.holdHours * 3600_000,
         status: "active",
@@ -412,7 +545,7 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
       setReservations((r) => [res, ...r]);
       return { ok: true };
     },
-    [applyStockDelta, user, warehouses],
+    [applyStockDelta, hoursToImpact, phase, reservations, user, warehouses],
   );
 
   const expireReservation = useCallback(
@@ -464,7 +597,25 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
   const createDonationTicket = useCallback(
     (input: { warehouseId: string; lines: { item: CatalogItem; qty: number }[] }) => {
       const w = warehouses.find((x) => x.id === input.warehouseId);
-      if (!w || !user) return;
+      if (!w || !user) return { ok: false as const, reason: "Sign in required." };
+
+      const filtered = input.lines.filter((l) => l.qty > 0);
+      if (!filtered.length) return { ok: false as const, reason: "Add at least one donation line." };
+
+      const disallowed = Array.from(
+        new Set(
+          filtered
+            .map((l) => l.item.category)
+            .filter((c) => levelForCategory(w, c) === "green"),
+        ),
+      );
+      if (disallowed.length > 0) {
+        const names = disallowed.map((c) => CATEGORY_LABELS[c] ?? c).join(", ");
+        return {
+          ok: false as const,
+          reason: `Thank you — ${w.name} is already full for ${names}. Please try the next hub for lanes that are low (yellow/red).`,
+        };
+      }
       const expected = expectedPointsForDonation(input.warehouseId, input.lines);
       const donorDisplayName = `${user.firstName} ${user.lastName}`.trim();
       const t: DonationTicket = {
@@ -487,6 +638,7 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
         donorDisplayName,
       };
       setTickets((x) => [t, ...x]);
+      return { ok: true as const };
     },
     [expectedPointsForDonation, user, warehouses],
   );
@@ -496,6 +648,9 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
       setTickets((prev) => {
         const t = prev.find((x) => x.id === id);
         if (!t) return prev;
+        if (hubSession && t.warehouseId !== hubSession.warehouseId) {
+          return prev;
+        }
         if (status === "closed" && t.status !== "closed") {
           const deltas: Partial<Record<NutritionCategory, number>> = {};
           for (const l of t.lines) {
@@ -523,7 +678,7 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
         return prev.map((x) => (x.id === id ? { ...x, status } : x));
       });
     },
-    [applyStockDelta],
+    [applyStockDelta, hubSession],
   );
 
   const redeemBonusItem = useCallback(
@@ -561,9 +716,143 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
     setBonusRedeemedThisVisit(false);
   }, []);
 
+  const purchaseHubStock = useCallback(
+    (
+      warehouseId: string,
+      category: NutritionCategory,
+      units: number,
+    ):
+      | { ok: true; added: number; cost: number }
+      | { ok: false; reason: string } => {
+      if (!hubSession || hubSession.warehouseId !== warehouseId) {
+        return { ok: false, reason: "Sign in as this hub to purchase stock." };
+      }
+      if (!Number.isFinite(units) || units <= 0 || !Number.isInteger(units)) {
+        return { ok: false, reason: "Enter a positive whole number of units." };
+      }
+      const w = warehouses.find((x) => x.id === warehouseId);
+      if (!w) return { ok: false, reason: "Hub not found." };
+      const room = w.categoryCaps[category] - w.categoryStock[category];
+      if (room <= 0) {
+        return { ok: false, reason: "This lane is already at shelf capacity." };
+      }
+      const add = Math.min(units, room);
+      const unitCost = RESTOCK_COST_PER_UNIT[category];
+      const cost = unitCost * add;
+      const balance = hubFunds[warehouseId] ?? 0;
+      if (balance < cost) {
+        return {
+          ok: false,
+          reason: `Need $${cost} for ${add} units (have $${balance}). Request funds from master admin.`,
+        };
+      }
+      setHubFunds((prev) => ({
+        ...prev,
+        [warehouseId]: (prev[warehouseId] ?? 0) - cost,
+      }));
+      applyStockDelta(warehouseId, { [category]: add });
+      const entry: HubLedgerEntry = {
+        id: uid("led"),
+        warehouseId,
+        kind: "restock",
+        amount: -cost,
+        note: `Restock +${add} ${category} @ $${unitCost}/u`,
+        at: Date.now(),
+      };
+      setHubLedger((prev) => [entry, ...prev]);
+      return { ok: true, added: add, cost };
+    },
+    [applyStockDelta, hubFunds, hubSession, warehouses],
+  );
+
+  const submitFundingRequest = useCallback(
+    (
+      warehouseId: string,
+      amount: number,
+      message: string,
+    ): { ok: true } | { ok: false; reason: string } => {
+      if (!hubSession || hubSession.warehouseId !== warehouseId) {
+        return { ok: false, reason: "Sign in as this hub to submit a request." };
+      }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return { ok: false, reason: "Enter a positive dollar amount." };
+      }
+      const w = warehouses.find((x) => x.id === warehouseId);
+      if (!w) return { ok: false, reason: "Hub not found." };
+      const req: FundingRequest = {
+        id: uid("fund"),
+        warehouseId,
+        warehouseName: w.name,
+        hubEmail: hubSession.email,
+        amount: Math.round(amount),
+        message: message.trim() || "—",
+        status: "pending",
+        createdAt: Date.now(),
+      };
+      setFundingRequests((prev) => [req, ...prev]);
+      return { ok: true };
+    },
+    [hubSession, warehouses],
+  );
+
+  const resolveFundingRequest = useCallback(
+    (
+      id: string,
+      decision: "approved" | "rejected",
+      grantAmount?: number,
+    ): { ok: true } | { ok: false; reason: string } => {
+      if (!adminSession) {
+        return { ok: false, reason: "Only the master admin can resolve funding requests." };
+      }
+      const req = fundingRequests.find((r) => r.id === id && r.status === "pending");
+      if (!req) return { ok: false, reason: "Request not found or already resolved." };
+      const now = Date.now();
+      if (decision === "rejected") {
+        setFundingRequests((prev) =>
+          prev.map((r) =>
+            r.id === id ? { ...r, status: "rejected" as const, resolvedAt: now } : r,
+          ),
+        );
+        return { ok: true };
+      }
+      const grant = Math.max(
+        0,
+        Math.round(grantAmount ?? req.amount),
+      );
+      setFundingRequests((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                status: "approved" as const,
+                resolvedAt: now,
+                grantAmount: grant,
+              }
+            : r,
+        ),
+      );
+      if (grant > 0) {
+        setHubFunds((prev) => ({
+          ...prev,
+          [req.warehouseId]: (prev[req.warehouseId] ?? 0) + grant,
+        }));
+        const entry: HubLedgerEntry = {
+          id: uid("led"),
+          warehouseId: req.warehouseId,
+          kind: "grant",
+          amount: grant,
+          note: `Master admin approved funding request ${id}`,
+          at: now,
+        };
+        setHubLedger((prev) => [entry, ...prev]);
+      }
+      return { ok: true };
+    },
+    [adminSession, fundingRequests],
+  );
+
   const resetDemo = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem("relief-hub-accounts-v1");
+    wipeReliefHubBrowserStorage();
     setWarehouses(cloneWarehouses());
     setPhaseState("watch_pre");
     setHoursToImpact(144);
@@ -572,6 +861,10 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
     setBonusRedeemedThisVisit(false);
     setUser(null);
     setAdminSession(false);
+    setHubSession(null);
+    setHubFunds(defaultHubFunds());
+    setFundingRequests([]);
+    setHubLedger([]);
     setCreditLedger({});
   }, []);
 
@@ -623,11 +916,20 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
       tickets,
       bonusRedeemedThisVisit,
       creditLedger,
+      hubSession,
+      hubFunds,
+      fundingRequests,
+      hubLedger,
       registerUser,
       loginUser,
       logoutUser,
       loginAdmin,
       logoutAdmin,
+      loginHub,
+      logoutHub,
+      purchaseHubStock,
+      submitFundingRequest,
+      resolveFundingRequest,
       setPhase,
       setHoursToImpact,
       createReservation,
@@ -652,11 +954,20 @@ export function ReliefProvider({ children }: { children: React.ReactNode }) {
       tickets,
       bonusRedeemedThisVisit,
       creditLedger,
+      hubSession,
+      hubFunds,
+      fundingRequests,
+      hubLedger,
       registerUser,
       loginUser,
       logoutUser,
       loginAdmin,
       logoutAdmin,
+      loginHub,
+      logoutHub,
+      purchaseHubStock,
+      submitFundingRequest,
+      resolveFundingRequest,
       setPhase,
       setHoursToImpact,
       createReservation,

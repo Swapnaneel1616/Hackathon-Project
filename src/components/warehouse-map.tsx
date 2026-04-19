@@ -14,7 +14,7 @@ function pos(w: Warehouse) {
 export function WarehouseMap({ warehouses }: { warehouses: Warehouse[] }) {
   return (
     <div className="glass relative overflow-hidden rounded-3xl map-grid">
-      <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-teal-400/8 via-transparent to-violet-400/6" />
       <div className="relative aspect-[16/11] w-full">
         {warehouses.map((w) => {
           const { x, y } = pos(w);
@@ -30,22 +30,22 @@ export function WarehouseMap({ warehouses }: { warehouses: Warehouse[] }) {
                 className={clsx(
                   "flex h-4 w-4 rounded-full ring-4 transition group-hover:scale-125",
                   sev >= 8
-                    ? "bg-rose-400 ring-rose-500/40"
+                    ? "bg-rose-500 ring-rose-400/35"
                     : sev >= 4
-                      ? "bg-amber-300 ring-amber-500/35"
-                      : "bg-emerald-400 ring-emerald-500/30",
+                      ? "bg-amber-400 ring-amber-400/35"
+                      : "bg-emerald-500 ring-emerald-400/35",
                 )}
               />
-              <span className="pointer-events-none absolute left-1/2 top-5 z-10 hidden w-40 -translate-x-1/2 rounded-lg border border-white/10 bg-slate-950/95 px-2 py-1 text-center text-[10px] font-semibold text-white shadow-xl group-hover:block">
+              <span className="pointer-events-none absolute left-1/2 top-5 z-10 hidden w-44 -translate-x-1/2 rounded-lg border border-slate-200/90 bg-white/95 px-2 py-1.5 text-center text-[10px] font-semibold text-slate-800 shadow-lg shadow-slate-400/25 backdrop-blur-sm group-hover:block">
                 {w.name}
               </span>
             </Link>
           );
         })}
       </div>
-      <div className="flex items-center justify-between border-t border-white/5 px-4 py-2 text-[10px] text-slate-500">
+      <div className="flex items-center justify-between border-t border-slate-200/70 bg-white/30 px-4 py-2 text-[10px] text-slate-600">
         <span>Live pins · sorted by critical lanes</span>
-        <span className="font-mono">Gov-fixed sites</span>
+        <span className="font-mono text-slate-500">Gov-fixed sites</span>
       </div>
     </div>
   );

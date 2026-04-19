@@ -50,18 +50,18 @@ export default function UserRegisterPage() {
   };
 
   const field =
-    "mt-1.5 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600";
+    "mt-1.5 w-full rounded-xl border border-slate-200/90 bg-slate-50/95 px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-600";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-16">
       <div className="glass w-full max-w-lg rounded-3xl p-8">
         <Link
           href="/"
-          className="text-xs font-semibold uppercase tracking-widest text-cyan-300/80 hover:text-cyan-200"
+          className="text-xs font-semibold uppercase tracking-widest text-teal-600 hover:text-teal-700"
         >
           ← Home
         </Link>
-        <h1 className="mt-4 flex items-center gap-2 text-2xl font-bold text-white">
+        <h1 className="mt-4 flex items-center gap-2 text-2xl font-bold text-slate-800">
           <UserPlus className="h-7 w-7 text-cyan-400" />
           Create resident account
         </h1>
@@ -69,6 +69,7 @@ export default function UserRegisterPage() {
           Full address helps hubs plan coverage. Demo passwords are stored locally
           only.
         </p>
+
         <form onSubmit={submit} className="mt-8 grid gap-4 sm:grid-cols-2">
           <label className="block text-sm text-slate-300 sm:col-span-1">
             First name
@@ -135,7 +136,7 @@ export default function UserRegisterPage() {
         </form>
         <p className="mt-6 text-center text-xs text-slate-500">
           Already registered?{" "}
-          <Link href="/user/login" className="text-cyan-300 hover:underline">
+          <Link href="/user/login" className="text-teal-600 hover:underline">
             Sign in
           </Link>
         </p>

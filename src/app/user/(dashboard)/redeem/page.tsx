@@ -37,7 +37,7 @@ export default function UserRedeemPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-white">Redeem at hub</h1>
+        <h1 className="text-3xl font-bold text-slate-800">Redeem at hub</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-400">
           One bonus item per visit — higher scarcity lanes cost more points.
         </p>
@@ -52,7 +52,7 @@ export default function UserRedeemPage() {
             <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               Wallet
             </div>
-            <div className="font-mono text-3xl font-bold text-amber-200">
+            <div className="font-mono text-3xl font-bold text-amber-800">
               {user?.points ?? 0}
               <span className="ml-2 text-sm font-normal text-slate-500">pts</span>
             </div>
@@ -64,7 +64,7 @@ export default function UserRedeemPage() {
             startWarehouseVisit();
             setNote("Visit mode reset — you can redeem one bonus this trip.");
           }}
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10"
+          className="rounded-xl border border-slate-200/90 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10"
         >
           Simulate new warehouse visit
         </button>
@@ -75,7 +75,7 @@ export default function UserRedeemPage() {
           <label className="block text-sm font-medium text-slate-300">
             Hub for redemption
             <select
-              className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none"
+              className="mt-1.5 w-full rounded-xl border border-slate-200/90 bg-white/85 px-3 py-2.5 text-sm text-slate-800 outline-none"
               value={hubId}
               onChange={(e) => setWhId(e.target.value)}
             >
@@ -103,12 +103,12 @@ export default function UserRedeemPage() {
                       type="button"
                       disabled={!affordable || bonusRedeemedThisVisit}
                       onClick={() => tryRedeem(c)}
-                      className="flex flex-col items-start gap-2 rounded-2xl border border-white/10 bg-black/30 p-4 text-left transition hover:border-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200/90 bg-slate-50/95 p-4 text-left transition hover:border-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <div className="flex w-full items-center justify-between gap-2">
                         <CategoryLanePill category={c} level={lvl} />
                       </div>
-                      <span className="font-mono text-lg text-cyan-200">
+                      <span className="font-mono text-lg text-teal-700">
                         {cost} pts
                       </span>
                       <span className="text-[10px] text-slate-500">
@@ -124,7 +124,7 @@ export default function UserRedeemPage() {
 
         <div className="glass flex flex-col justify-between rounded-3xl p-6">
           <div>
-            <div className="flex items-center gap-2 font-bold text-white">
+            <div className="flex items-center gap-2 font-bold text-slate-800">
               <ShoppingBag className="h-5 w-5 text-violet-300" />
               Visit rules
             </div>

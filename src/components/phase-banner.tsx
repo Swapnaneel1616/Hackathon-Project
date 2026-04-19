@@ -10,47 +10,54 @@ export function PhaseBanner() {
     phase === "watch_pre"
       ? {
           icon: CloudSnow,
+          chip: "Before · Prepare",
           title: "Pre-impact preparedness window",
           body: "Reserve balanced baskets, donate surplus, and let hubs rebalance stock before intake closes.",
-          tone: "border-cyan-500/30 bg-cyan-500/10 text-cyan-100",
+            bar: "border-l-[5px] border-l-[var(--field-green)] bg-[rgba(245,240,232,0.95)]",
         }
       : phase === "watch_critical"
         ? {
             icon: AlertTriangle,
-            title: "Critical watch — warehouse intake closing soon",
-            body: "Complete pickup reservations on time or holds release. Hubs stage convoys to shelter spokes.",
-            tone: "border-amber-500/35 bg-amber-500/10 text-amber-100",
+            chip: "Early warning · Active",
+            title: "Critical watch — intake closing soon",
+            body: "Complete holds on time or stock returns to the commons. Harvest amber signals urgency without panic.",
+            bar: "border-l-[5px] border-l-[var(--harvest-amber)] bg-[rgba(245,240,232,0.98)]",
           }
         : phase === "during"
           ? {
               icon: Shield,
+              chip: "During · Crisis routing",
               title: "Hazard active — hub & spoke operations",
-              body: "Government shelters and cloud-kitchen nodes stay live. Staff mode serves households without smartphones.",
-              tone: "border-rose-500/35 bg-rose-500/10 text-rose-100",
+              body: "Terracotta marks live crisis coordination: shelters and hubs share one operational rhythm.",
+              bar: "border-l-[5px] border-l-[var(--alert-terracotta)] bg-[rgba(245,240,232,0.97)]",
             }
           : {
               icon: Home,
+              chip: "After · Recover",
               title: "Recovery routing",
-              body: "Scale-based split between warehouse coordination and shelter distribution until corridors normalize.",
-              tone: "border-violet-500/35 bg-violet-500/10 text-violet-100",
+              body: "Replenish, learn, and adapt until corridors normalize — split between warehouse and shelter spokes.",
+              bar: "border-l-[5px] border-l-[#6b8faf] bg-[rgba(245,240,232,0.96)]",
             };
 
   const Icon = meta.icon;
 
   return (
     <div
-      className={`flex flex-wrap items-start gap-3 rounded-2xl border px-4 py-3 ${meta.tone}`}
+      className={`flex flex-wrap items-start gap-3 rounded-2xl border border-[var(--reserve-green)]/10 pl-4 pr-4 py-3 shadow-sm ${meta.bar}`}
     >
-      <Icon className="mt-0.5 h-5 w-5 shrink-0 opacity-90" />
+      <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[var(--field-green)]" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">{meta.title}</p>
-        <p className="mt-1 text-xs leading-relaxed opacity-90">{meta.body}</p>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--caption-muted)]">
+          {meta.chip}
+        </p>
+        <p className="mt-1 text-sm font-semibold text-[var(--earth-dark)]">{meta.title}</p>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--body-text)]">{meta.body}</p>
       </div>
-      <div className="shrink-0 rounded-xl bg-black/20 px-3 py-2 text-center font-mono text-xs">
-        <div className="text-[10px] uppercase tracking-widest text-white/60">
+      <div className="shrink-0 rounded-xl border border-[var(--reserve-green)]/12 bg-white/80 px-3 py-2 text-center shadow-inner">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--caption-muted)]">
           Countdown
         </div>
-        <div className="text-lg font-bold text-white">{hoursToImpact}h</div>
+        <div className="text-lg font-bold tabular-nums text-[var(--reserve-green)]">{hoursToImpact}h</div>
       </div>
     </div>
   );

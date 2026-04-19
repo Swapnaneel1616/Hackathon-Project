@@ -10,9 +10,9 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "ReliefGrid — Preparedness-to-Response Food Hub",
+  title: "ReliefGrid — Feeding communities when it matters most",
   description:
-    "Pre-disaster warehouse reservations, donor tickets, and shelter-spoke coordination for equitable food access.",
+    "Local knowledge, pre-positioned resilience, and dignified access: reservations, hub reserves, donor verification, and master observability for equitable food relief.",
 };
 
 export default function RootLayout({
