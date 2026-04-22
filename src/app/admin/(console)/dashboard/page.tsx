@@ -8,6 +8,18 @@ import { useRelief } from "@/context/relief-context";
 import type { NutritionCategory } from "@/lib/types";
 
 type Tab = "observe" | "requests";
+type RegionUnit = {
+  id: string;
+  name: string;
+  fundingUsd: number;
+  stock: Record<NutritionCategory, number>;
+  cap: Record<NutritionCategory, number>;
+};
+type RegionCard = {
+  id: string;
+  name: string;
+  units: RegionUnit[];
+};
 
 export default function MasterAdminDashboardPage() {
   const {
@@ -21,32 +33,101 @@ export default function MasterAdminDashboardPage() {
   } = useRelief();
   const [tab, setTab] = useState<Tab>("observe");
   const [grantInputs, setGrantInputs] = useState<Record<string, string>>({});
+  const [selectedRegionId, setSelectedRegionId] = useState("region-1");
+  const [selectedUnitId, setSelectedUnitId] = useState("");
 
   const cats = Object.keys(CATEGORY_LABELS) as NutritionCategory[];
 
-  const aggregates = useMemo(() => {
-    const totals: Record<NutritionCategory, number> = {
-      protein: 0,
-      carbs: 0,
-      fiber: 0,
-      produce: 0,
-      hydration: 0,
-    };
-    const caps: Record<NutritionCategory, number> = {
-      protein: 0,
-      carbs: 0,
-      fiber: 0,
-      produce: 0,
-      hydration: 0,
-    };
-    for (const w of warehouses) {
+  const regions = useMemo<RegionCard[]>(() => {
+    const regionOneUnits: RegionUnit[] = warehouses.map((w) => ({
+      id: w.id,
+      name: w.name,
+      fundingUsd: 28_000,
+      stock: w.categoryStock,
+      cap: w.categoryCaps,
+    }));
+    const emptyLane = () =>
+      ({
+        protein: 0,
+        carbs: 0,
+        fiber: 0,
+        produce: 0,
+        hydration: 0,
+      }) as Record<NutritionCategory, number>;
+    const mockUnit = (id: string, name: string, seed: number): RegionUnit => {
+      const stock = emptyLane();
+      const cap = emptyLane();
       for (const c of cats) {
-        totals[c] += w.categoryStock[c];
-        caps[c] += w.categoryCaps[c];
+        const capVal = 600 + seed * 90;
+        const ratioBase = 0.3 + ((seed * 7 + c.length * 3) % 45) / 100;
+        cap[c] = capVal;
+        stock[c] = Math.round(capVal * Math.min(0.92, ratioBase));
+      }
+      return {
+        id,
+        name,
+        fundingUsd: 18_000 + seed * 2_500,
+        stock,
+        cap,
+      };
+    };
+
+    return [
+      { id: "region-1", name: "Region 1", units: regionOneUnits },
+      {
+        id: "region-2",
+        name: "Region 2",
+        units: [mockUnit("r2-u1", "Westfield Relief Unit", 2), mockUnit("r2-u2", "Lakepoint Aid Unit", 3)],
+      },
+      {
+        id: "region-3",
+        name: "Region 3",
+        units: [mockUnit("r3-u1", "Hilltop Nutrition Unit", 4), mockUnit("r3-u2", "Central Depot Unit", 5)],
+      },
+      {
+        id: "region-4",
+        name: "Region 4",
+        units: [mockUnit("r4-u1", "Ridgeway Distribution Unit", 6), mockUnit("r4-u2", "Valley Base Unit", 7)],
+      },
+      {
+        id: "region-5",
+        name: "Region 5",
+        units: [mockUnit("r5-u1", "Harborline Response Unit", 8), mockUnit("r5-u2", "Southport Supply Unit", 9)],
+      },
+      {
+        id: "region-6",
+        name: "Region 6",
+        units: [mockUnit("r6-u1", "Pinecrest Recovery Unit", 10), mockUnit("r6-u2", "Delta Grid Unit", 11)],
+      },
+    ];
+  }, [warehouses, cats]);
+  const selectedRegion = regions.find((r) => r.id === selectedRegionId) ?? regions[0];
+  const selectedUnit = selectedRegion?.units.find((u) => u.id === selectedUnitId) ?? selectedRegion?.units[0];
+
+  const selectedRegionAggregates = useMemo(() => {
+    const totals = {
+      protein: 0,
+      carbs: 0,
+      fiber: 0,
+      produce: 0,
+      hydration: 0,
+    } as Record<NutritionCategory, number>;
+    const caps = {
+      protein: 0,
+      carbs: 0,
+      fiber: 0,
+      produce: 0,
+      hydration: 0,
+    } as Record<NutritionCategory, number>;
+    if (!selectedRegion) return { totals, caps };
+    for (const unit of selectedRegion.units) {
+      for (const c of cats) {
+        totals[c] += unit.stock[c];
+        caps[c] += unit.cap[c];
       }
     }
     return { totals, caps };
-  }, [warehouses, cats]);
+  }, [cats, selectedRegion]);
 
   const activeRes = reservations.filter((r) => r.status === "active").length;
   const pendingTickets = tickets.filter((t) => t.status === "pending").length;
@@ -127,12 +208,122 @@ export default function MasterAdminDashboardPage() {
           <section className="glass rounded-2xl p-6">
             <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800">
               <BarChart3 className="h-5 w-5 text-orange-400" />
-              Regional food lanes (aggregate stock / aggregate cap)
+              Regional nutrition intelligence
             </h2>
-            <div className="mt-6 space-y-4">
+            <p className="mt-1 text-xs text-slate-500">
+              Select a region card, then a unit, to inspect nutrition delivery performance and funding-linked capacity.
+            </p>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              {regions.map((region) => {
+                const isSelected = region.id === selectedRegion?.id;
+                const totalUnits = region.units.length;
+                const funded = region.units.reduce((sum, u) => sum + u.fundingUsd, 0);
+                return (
+                  <button
+                    key={region.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRegionId(region.id);
+                      setSelectedUnitId(region.units[0]?.id ?? "");
+                    }}
+                    className={`rounded-xl border p-3 text-left transition ${
+                      isSelected
+                        ? "border-[var(--field-green)]/50 bg-[rgba(73,120,188,0.12)]"
+                        : "border-slate-200/80 bg-white/70 hover:border-[var(--field-green)]/35"
+                    }`}
+                  >
+                    <p className="text-sm font-bold text-slate-800">{region.name}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">{totalUnits} units tracked</p>
+                    <p className="mt-1 font-mono text-[11px] text-[var(--field-green)]">${funded.toLocaleString()} funding</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {selectedRegion && (
+              <div className="mt-5 rounded-2xl border border-slate-200/80 bg-white/70 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Selected region</p>
+                    <p className="text-lg font-bold text-slate-800">{selectedRegion.name}</p>
+                  </div>
+                  <label className="text-xs text-slate-600">
+                    Select unit
+                    <select
+                      className="ml-2 rounded-lg border border-slate-200/90 bg-white px-2 py-1 text-xs text-slate-800"
+                      value={selectedUnit?.id ?? ""}
+                      onChange={(e) => setSelectedUnitId(e.target.value)}
+                    >
+                      {selectedRegion.units.map((unit) => (
+                        <option key={unit.id} value={unit.id}>
+                          {unit.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  {cats.map((c) => {
+                    const stock = selectedUnit?.stock[c] ?? 0;
+                    const cap = selectedUnit?.cap[c] ?? 1;
+                    const pct = Math.min(100, Math.round((stock / cap) * 100));
+                    return (
+                      <div key={c} className="rounded-xl border border-slate-200/80 bg-slate-50/90 p-3 text-center">
+                        <div
+                          className="mx-auto flex h-20 w-20 items-center justify-center rounded-full text-xs font-bold text-slate-800"
+                          style={{
+                            background: `conic-gradient(#22c55e ${pct * 3.6}deg, #e2e8f0 ${pct * 3.6}deg 360deg)`,
+                          }}
+                        >
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white">{pct}%</div>
+                        </div>
+                        <p className="mt-2 text-xs font-semibold text-slate-700">{CATEGORY_LABELS[c]}</p>
+                        <p className="mt-1 font-mono text-[11px] text-slate-500">
+                          {stock} / {cap}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 grid gap-2 text-xs text-slate-600 md:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200/70 bg-white px-3 py-2">
+                    Unit funding:{" "}
+                    <span className="font-mono font-semibold text-[var(--field-green)]">
+                      ${(selectedUnit?.fundingUsd ?? 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200/70 bg-white px-3 py-2">
+                    Region units: <span className="font-semibold text-slate-800">{selectedRegion.units.length}</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200/70 bg-white px-3 py-2">
+                    Region fill avg:{" "}
+                    <span className="font-mono font-semibold text-slate-800">
+                      {Math.round(
+                        (cats.reduce((sum, c) => {
+                          const cap = selectedRegionAggregates.caps[c] || 1;
+                          return sum + (selectedRegionAggregates.totals[c] / cap) * 100;
+                        }, 0) || 0) / cats.length,
+                      )}
+                      %
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="glass rounded-2xl p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-800">
+              <BarChart3 className="h-5 w-5 text-orange-400" />
+              Selected region aggregate lanes
+            </h2>
+            <div className="space-y-4">
               {cats.map((c) => {
-                const t = aggregates.totals[c];
-                const cap = aggregates.caps[c] || 1;
+                const t = selectedRegionAggregates.totals[c];
+                const cap = selectedRegionAggregates.caps[c] || 1;
                 const pct = (t / cap) * 100;
                 return (
                   <div key={c}>
